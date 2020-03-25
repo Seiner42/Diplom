@@ -17,7 +17,6 @@ namespace DiplomV01
         OpenFileDialog openFile = new OpenFileDialog();
         String line = "";
         List<dpmClass> dpmList = new List<dpmClass>();
-        String Test;
         public mainWindow()
         {
             InitializeComponent();
