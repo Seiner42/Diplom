@@ -64,6 +64,18 @@ namespace DiplomV01
                                 }
                                 break;
                             case 'S':
+                                for (int i = 1; i < words.Length; i++)
+                                {
+                                    switch (words[i][0])
+                                    {
+                                        case '(':
+                                            string[] digit = Regex.Split(words[i], @"\D+");
+
+                                            break;
+                                        case '[':
+                                            break;
+                                    }
+                                }
                                 break;
                             case 'B':
                                 break;

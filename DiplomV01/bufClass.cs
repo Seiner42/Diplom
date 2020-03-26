@@ -8,6 +8,6 @@ namespace DiplomV01
 {
     class bufClass
     {
-        public List<int> inBuf = new List<int>();
+
     }
 }
