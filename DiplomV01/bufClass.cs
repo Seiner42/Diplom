@@ -13,5 +13,6 @@ namespace DiplomV01
         public int input;//номер машины которая записывает в буфер
         public int output;//номер машины которая читает из буфера
         public int blockedDPMnum = -1;//номер заблокированной машины
+        public int lastDataChange = 0;//время последнего появления данных
     }
 }
