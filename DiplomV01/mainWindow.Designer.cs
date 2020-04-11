@@ -79,7 +79,6 @@
             this.zedGraphControl1.Size = new System.Drawing.Size(1737, 993);
             this.zedGraphControl1.TabIndex = 5;
             this.zedGraphControl1.UseExtendedPrintDialog = true;
-            this.zedGraphControl1.Load += new System.EventHandler(this.zedGraphControl1_Load);
             // 
             // textBox1
             // 

@@ -15,6 +15,6 @@ namespace DiplomV01
         }
         public List<comClass> comList = new List<comClass>();//список коммуникаторов каждой итерации
         public int performance;//"производительность итерации
-        //создать списки для точек, чтобы потом не перемоделировать а просто построить
+        public int time;
     }
 }
