@@ -10,10 +10,10 @@ namespace DiplomV01
     {
         public class commandStruct
         {
-           public string commandType;//тип команды
-           public int waitTime;//время ожидания
-           public int dataSize;//размер данных
-           public int destination;//в какой буфер положить/считать
+            public string commandType;//тип команды
+            public int waitTime;//время ожидания
+            public int dataSize;//размер данных
+            public int destination;//в какой буфер положить/считать
         }
         public List<int> inBuf = new List<int>();//список буферов входящих в машину
         public List<int> outBuf = new List<int>();//список буферов выходящих из машины
