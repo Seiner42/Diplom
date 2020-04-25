@@ -36,6 +36,7 @@ namespace DiplomV01
             comboBox1.Items.Add("Удалять недогруженные");
             comboBox1.Items.Add("sizeOfData");
             comboBox1.Items.Add("connections");
+            comboBox1.Items.Add("parallel");
 
             //инициализация графика
             pane = zedGraphControl1.GraphPane;//панель рисования(холст)
@@ -502,6 +503,7 @@ namespace DiplomV01
                         comList.Add(new nedogruzMod());//создали com
                         for (int z = 0; z < del; z++)//заполняем коммуникатор буферами
                         {
+                            //поиск самого "тяжелого" буфера
                             int idxMax = 0;
                             int mx = 0;
                             for (int o = 0; o < bcount; o++)//обходим каждый буфер
@@ -518,7 +520,7 @@ namespace DiplomV01
                             percents[idxofMaxConnection] -= percentList[idxMax];//уменьшили нагружку на связь
                             percentList[idxMax] = -1;
                             //удаляем из связи
-                            connetctionList[idxofMaxConnection].buffers.Remove(mx);
+                            connetctionList[idxofMaxConnection].buffers.Remove(idxMax);
                             //теперь удалить из percents проценты
                         }
                     }
@@ -528,9 +530,9 @@ namespace DiplomV01
                         comList.Add(new nedogruzMod());//создаем коммуникатор
                         //добавляем все буферы текущей соединялки
                         //добавляем в коммуникатор буферы
-                        for (int j = 0; j < connetctionList[i].buffers.Count; j++)
+                        for (int j = 0; j < connetctionList[i-1].buffers.Count; j++)
                         {
-                            comList[i].comBufList.Add(connetctionList[i].buffers[j]);//распределили буферы по коммуникаторам
+                            comList[i].comBufList.Add(connetctionList[i-1].buffers[j]);//распределили буферы по коммуникаторам
                         }
                     }
                     //добавляем машины
@@ -550,12 +552,171 @@ namespace DiplomV01
                     }
                     break;
                 case 3://если коммуникаторов меньше, чем связей
-                    //если коммуникаторов меньше, значит нужно определить % нагрузки каждой связи от общего и распределить равномерно
+                       //если коммуникаторов меньше, значит нужно определить % нагрузки каждой связи от общего и распределить равномерно
+                    List<bool> isEnded1 = new List<bool>();//прошла ли машина все свои команды
+                    List<int> isEndedCount1 = new List<int>();//сколько рабочих циклов каждой машины
+                    for (int i = 0; i < dpmList.Count; i++)
+                    {
+                        isEnded1.Add(false);
+                        isEndedCount1.Add(0);
+                    }
+                    bool cycleOver1 = false;//
+                                           //вычисляем рабочий цикл
+                    while (cycleOver1 != true)//пока все машины не отработают свой рабочй цикл
+                    {
+                        //моделирование
+                        for (int i = 0; i < dpmList.Count; i++)//Обход каждой машины
+                        {
+                            //проверка на текущую команду
+                            if (dpmList[i].currentCommand >= dpmList[i].dpmCommandList.Count)
+                            {//если машина выполнила все свои инструкции начинаем с *
+                                dpmList[i].currentCommand = dpmList[i].repeatComNum;
+                                //фиксируем конец машины
+                                isEnded1[i] = true;
+                                isEndedCount1[i]++;
+                            }
+                            //выполнение команды
+                            //определить тип команды
+                            switch (dpmList[i].dpmCommandList[dpmList[i].currentCommand].commandType)//
+                            {
+                                case "write"://если запись
+                                             //удачно
+                                             //проверяем свободное место
+                                    if ((bufList[dpmList[i].dpmCommandList[dpmList[i].currentCommand].destination].bufSize - bufList[dpmList[i].dpmCommandList[dpmList[i].currentCommand].destination].dataInBuf) >= dpmList[i].dpmCommandList[dpmList[i].currentCommand].dataSize)
+                                    {//добавляем данные
+                                        bufList[dpmList[i].dpmCommandList[dpmList[i].currentCommand].destination].dataInBuf += dpmList[i].dpmCommandList[dpmList[i].currentCommand].dataSize;
+                                        dpmList[i].currentCommand++;
+                                    }
+                                    //неудачно
+                                    break;
+                                case "read"://если чтение
+                                            //удачно
+                                            //проверяем наличие данных
+                                    if (bufList[dpmList[i].dpmCommandList[dpmList[i].currentCommand].destination].dataInBuf >= dpmList[i].dpmCommandList[dpmList[i].currentCommand].dataSize)
+                                    {//удаляем их
+                                        bufList[dpmList[i].dpmCommandList[dpmList[i].currentCommand].destination].dataInBuf -= dpmList[i].dpmCommandList[dpmList[i].currentCommand].dataSize;
+                                        dpmList[i].currentCommand++;
+                                    }
+                                    //неудачно
+                                    break;
+                                case "wait"://если ждать
+                                            //переход к следующей команде
+                                    dpmList[i].currentCommand++;
+                                    break;
+                            }
+                        }
+                        //проверка на завершение
+                        int cnt = 0;
+                        for (int i = 0; i < dpmList.Count; i++)
+                        {
+                            if (isEnded1[i] == true)
+                            {
+                                cnt++;
+                            }
+                        }//если все машины выполнили свою программу хотябы 1 раз
+                        if (cnt == dpmList.Count)
+                        {
+                            cycleOver1 = true;
+                        }
+                    }
+                    //считаем объем 
+                    List<int> bufComCount1 = new List<int>();//кол-во обращений к каждому буферу
+                    for (int i = 0; i < bufList.Count; i++)
+                    {
+                        bufComCount1.Add(0);
+                    }
+                    int comandsNumber1 = 0;//общее количество команд
+                                          //нужно посчитать сколько обращений к каждому буферу, учитывая рабочие циклы
+                    for (int i = 0; i < dpmList.Count; i++)//для каждой машины
+                    {
+                        for (int j = 0; j < isEndedCount1[i]; j++)//для каждого рабочего цикла
+                        {
+                            for (int k = 0; k < dpmList[i].dpmCommandList.Count; k++)//обходим список команд
+                            {
+                                if ((dpmList[i].dpmCommandList[k].commandType == "write") || (dpmList[i].dpmCommandList[k].commandType == "read"))
+                                {
+                                    comandsNumber1++;//общее число команд
+                                    bufComCount1[dpmList[i].dpmCommandList[k].destination]++;//число обращений к конкретному буферу
+                                }
+                            }
+                        }
+                    }
+                    //теперь посчитать, сколько в процентном соотношении обращений к каждому буферу
+                    List<int> percentList1 = new List<int>();
+                    for (int i = 0; i < bufComCount1.Count; i++)
+                    {
+                        percentList1.Add(GetPercent(bufComCount1[i], comandsNumber1));
+                    }
 
-                    //опредлеяем % для каждой связи
+                    for (int l = 0; l < connetctionList.Count; l++)
+                    {//каждая связь
+                        //обходим буферы каждой связи
+                        for (int n = 0; n < connetctionList[l].buffers.Count; n++)
+                        {
+                            connetctionList[l].impPercent += percentList1[connetctionList[l].buffers[n]];
 
+                        }
+                    }
+                    //нашли % нагназки каждой связи
                     //распределяем равномерно по коммуникаторам
+                    List<int> percents1 = new List<int>();
+                    for (int s = 0; s < connetctionList.Count; s++)
+                    {
+                        percents1.Add(connetctionList[s].impPercent);//списк нагрузки связей
+                    }
 
+                    int[] numbers = percents1.ToArray();
+                    int pilesNumber = comCount;
+                    int sum = numbers.Sum();
+                    int combNumber = numbers.Aggregate(1, (m, number) => m * pilesNumber);
+                    var perfectCombination =
+                        Enumerable.Range(0, combNumber)
+                                  .Select(x =>
+                                  {
+                                      var piles =
+                                          Enumerable.Range(0, pilesNumber)
+                                                    .Select(y => new List<int>(numbers.Length))
+                                                    .ToArray();
+                                      foreach (var n in numbers)
+                                      {
+                                          piles[x % pilesNumber].Add(n);
+                                          x /= pilesNumber;
+                                      }
+                                      return piles;
+                                  })
+                                  .MinBy(piles => piles.Sum(pile => Math.Abs(pile.Sum() * pilesNumber - sum)));
+
+                    List<List<int>> agreg = new List<List<int>>();//вариант агрегации итоговый
+                    agreg = perfectCombination.First().ToList();
+
+                    for (int i = 0; i < comCount; i++)//каждый коммуникатор
+                    {
+                        comList.Add(new nedogruzMod());//создаем коммуникатор
+                                                       //добавляем в коммуникатор буферы
+                        for (int j = 0; j < agreg[i].Count; j++)
+                        {
+                            for (int buf = 0; buf < connetctionList[percents1.IndexOf(agreg[i][j])].buffers.Count; buf++)
+                            {
+                                comList[i].comBufList.Add(connetctionList[percents1.IndexOf(agreg[i][j])].buffers[buf]);
+                            }
+                            percents1[percents1.IndexOf(agreg[i][j])] = -1;
+                        }
+                    }
+                    //добавляем машины
+                    for (int j = 0; j < comList.Count; j++)//для каждого коммуникатора
+                    {
+                        for (int k = 0; k < comList[j].comBufList.Count; k++)//каждый коммуникатор реализаует минимум один буфер, обходим все
+                        {
+                            if (!comList[j].connectedDPMs.Exists((x) => x == bufList[comList[j].comBufList[k]].input))
+                            {
+                                comList[j].connectedDPMs.Add(bufList[comList[j].comBufList[k]].input);
+                            }
+                            if (!comList[j].connectedDPMs.Exists((x) => x == bufList[comList[j].comBufList[k]].output))
+                            {
+                                comList[j].connectedDPMs.Add(bufList[comList[j].comBufList[k]].output);
+                            }
+                        }
+                    }
                     break;
             }
             //здесь финальное моделирование
@@ -1386,6 +1547,542 @@ namespace DiplomV01
             File.AppendAllText(filePath + "log.txt", sb.ToString());
             sb.Clear();
 
+        }
+
+        private void parallel()
+        {
+            //моделирование когда число коммуникаторов = число буферов
+            //первый этап, каждый внешний буфер реализуется отдельным коммуникатором
+            List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
+            for (int i = 0; i < bufList.Count; i++)
+            {//присвоение коммуникаторам буферов
+                comList.Add(new nedogruzMod());//создаем коммуникатор
+                comList[i].comBufList.Add(i);//добавляем в него буфер
+            }
+            //подключенные к коммуникатору машины
+            for (int j = 0; j < comList.Count; j++)//для каждого коммуникатора
+            {
+                for (int k = 0; k < comList[j].comBufList.Count; k++)//каждый коммуникатор реализаует минимум один буфер, обходим все
+                {
+                    if (!comList[j].connectedDPMs.Exists((x) => x == bufList[comList[j].comBufList[k]].input))
+                    {
+                        comList[j].connectedDPMs.Add(bufList[comList[j].comBufList[k]].input);
+                    }
+                    if (!comList[j].connectedDPMs.Exists((x) => x == bufList[comList[j].comBufList[k]].output))
+                    {
+                        comList[j].connectedDPMs.Add(bufList[comList[j].comBufList[k]].output);
+                    }
+                }
+            }
+            for (int circle = 0; circle < 1000; circle++)//цикл в котором происходит моделирование
+            {
+                //первый этап, машины выставляют заявки
+                for (int j = 0; j < dpmList.Count; j++)//обход каждой машины
+                {
+                    //проверка на повторное исполнение команд
+                    if (dpmList[j].currentCommand >= dpmList[j].dpmCommandList.Count)
+                    {
+                        dpmList[j].currentCommand = dpmList[j].repeatComNum;//если машина выполнила все инструкции, начинает работать с повторяемой
+                    }
+                    if (dpmList[j].exchangeReady == false)//если машина не выставила заявку на обмен
+                    {
+                        switch (dpmList[j].dpmCommandList[dpmList[j].currentCommand].commandType)//проверяем тип текущей команды машины
+                        {
+                            case "wait"://если ожидание
+                                dpmList[j].currentTime += dpmList[j].dpmCommandList[dpmList[j].currentCommand].waitTime;//если инструкция ждать, машина просто ждет
+                                dpmList[j].currentCommand++;//Выполнили команду, переходим к следующей
+                                break;
+                            case "write"://если запись
+                            case "read"://если чтение
+                                dpmList[j].exchangeReady = true;//заявка на обмен выставлена
+                                break;
+                        }
+                    }
+                }
+                //Этап второй, коммуникаторы обрабатывают заявки
+                for (int k = 0; k < comList.Count; k++)//обход каждого коммуникатора
+                {
+                    int stp = 0;
+                    int min = 0;
+                    int minIdx = 0;
+                    //опрос коммуникатором машины
+                    for (int l = 0; l < comList[k].connectedDPMs.Count; l++)//каждый коммуникатор проверяет связанные с ним машины
+                    {
+                        //если машина готова к обмену и хочет использовать именно этот коммуникатор и не заблокирована
+                        if ((dpmList[comList[k].connectedDPMs[l]].exchangeReady == true) && (comList[k].comBufList.Contains(dpmList[comList[k].connectedDPMs[l]].dpmCommandList[dpmList[comList[k].connectedDPMs[l]].currentCommand].destination)) && (dpmList[comList[k].connectedDPMs[l]].isBlocked == false))
+                        {
+                            //ищем минимальную выставленную заявку
+                            if (stp == 0)//если это первая готовая машина
+                            {
+                                minIdx = comList[k].connectedDPMs[l];//запоминаем индекс
+                                min = dpmList[comList[k].connectedDPMs[l]].currentTime;//запоминаем время
+                                stp++;
+                            }
+                            else
+                            {
+                                if (dpmList[comList[k].connectedDPMs[l]].currentTime < min)
+                                {
+                                    minIdx = comList[k].connectedDPMs[l];//запоминаем индекс
+                                    min = dpmList[comList[k].connectedDPMs[l]].currentTime;//запоминаем время
+                                }
+                            }
+                        }
+                    }
+                    if (stp > 0)//если нашли заявку нужно её отработать
+                    {
+                        //отработать удачный обмен и неудачный 
+                        switch (dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].commandType)
+                        {
+                            case "write"://если машина хочет записать информацию, проверяем что в буфере есть свободные ячейки
+                                         //вычисляем свободные ячейки в нужно буфере
+                                int freeSpace = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].bufSize - bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf;
+                                //если число свободных ячеек больше или равен чем объекм передаваемых данных
+                                if (freeSpace >= dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize)
+                                {
+                                    //проверить параллельность
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
+                                    {//если данные в буфере появились позже чем текущее время машины. "догоняем"
+                                     //эмулируем неудачный обмен
+                                     //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
+                                        dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
+                                    }
+
+                                    //в буфер записались данные
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //добавляем на график (curTime/bufNum/dataSize)
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataChangedList.Add(dpmList[minIdx].currentTime);
+                                    //время машины сдвигаем
+                                    dpmList[minIdx].currentTime += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //сохраняем время когда данные есть
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange = dpmList[minIdx].currentTime;
+                                    //двигаем все остальные буферы подключенные к коммуникатору на объем данных
+                                    for (int s = 0; s < comList[k].comBufList.Count; s++)
+                                    {
+                                        if (s != dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination)
+                                        {  //кроме текущего
+                                           //bufList[pereborList[i].comList[k].comBufList[s]].lastDataChange += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                            bufList[comList[k].comBufList[s]].lastDataChange = dpmList[minIdx].currentTime;
+                                        }
+                                    }
+                                    //проверям можно ли разблокировать какую-то машину
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum != -1)
+                                    {
+                                        //разблокируем машина
+                                        dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].isBlocked = false;
+                                        //нужно продвинуть время машины
+                                        //Новое текущее время заблоченной машины = curTime разлокрирубщей - curTime заблокированной
+                                        //   dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime += (dpmList[minIdx].currentTime - dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime);
+                                        //очищаем номер
+                                        bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = -1;
+                                    }
+                                    //переключаем команду дпм
+                                    dpmList[minIdx].currentCommand++;
+                                    //снимаем заявку на обмен
+                                    dpmList[minIdx].exchangeReady = false;
+                                    //фиксируем удачный обмен
+                                    comList[k].performance++;
+                                }
+                                else//неудачная попытка обмена
+                                {
+                                    //блокируем машину
+                                    dpmList[minIdx].isBlocked = true;
+                                    //записываем номер заблокированной машины
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = minIdx;
+                                }
+                                break;
+                            case "read"://если машина хочет считать информацию, проверяем что информация есть в нужном буфере
+                                        //если число данных в буфере больше или равно объема принимаемых данных
+                                if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf >= dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize)
+                                {
+                                    //проверить параллельность
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
+                                    { //если данные в буфере появились позже чем текущее время машины. "догоняем"
+                                      //эмулируем неудачный обмен
+                                      //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
+                                        dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
+                                    }
+
+                                    //в буфере удаляются данные
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf -= dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //добавляем на график (curTime/bufNum/dataSize)
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataChangedList.Add(dpmList[minIdx].currentTime);
+                                    //время машины сдвигаем
+                                    dpmList[minIdx].currentTime += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //сохраняем время когда данные есть
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange = dpmList[minIdx].currentTime;
+                                    //двигаем все остальные буферы подключенные к коммуникатору на объем данных
+                                    for (int s = 0; s < comList[k].comBufList.Count; s++)
+                                    {
+                                        if (s != dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination)
+                                        {   //кроме текущего
+                                            //bufList[pereborList[i].comList[k].comBufList[s]].lastDataChange += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                            bufList[comList[k].comBufList[s]].lastDataChange = dpmList[minIdx].currentTime;
+                                        }
+                                    }
+                                    //проверям можно ли разблокировать какую-то машину
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum != -1)
+                                    {
+                                        //разблокируем машина
+                                        dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].isBlocked = false;
+                                        //нужно продвинуть время машины
+                                        //Новое текущее время заблоченной машины = curTime разлокрирубщей - curTime заблокированной
+                                        //   dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime += (dpmList[minIdx].currentTime - dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime);
+                                        //очищаем номер
+                                        bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = -1;
+                                    }
+                                    //переключаем команду дпм
+                                    dpmList[minIdx].currentCommand++;
+                                    //снимаем заявку на обмен
+                                    dpmList[minIdx].exchangeReady = false;
+                                    //фиксируем удачный обмен
+                                    comList[k].performance++;
+                                }
+                                else//неудачная попытка обмена
+                                {
+                                    //блокируем машину
+                                    dpmList[minIdx].isBlocked = true;
+                                    //записываем номер заблокированной машины
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = minIdx;
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
+            //подсчет числа параллельных команд каждого с каждым
+            for(int i = 0; i < bufList.Count; i++)//для каждого буфера
+            {
+                for(int j = 0; j < bufList.Count; j++)//сравниваем с другими буферами
+                {
+                    if (i != j)//кроме самого себя
+                    {
+                        bufList[i].allParallelsList.Add(new bufClass.parall());
+                        bufList[i].allParallelsList[bufList[i].allParallelsList.IndexOf(bufList[i].allParallelsList.Last())].oposeBuFNum = j;
+                        //число совпадающих элементов
+                        bufList[i].allParallelsList[bufList[i].allParallelsList.IndexOf(bufList[i].allParallelsList.Last())].totalParallel = bufList[i].dataChangedList.Intersect(bufList[j].dataChangedList).Count();
+                        //получаем сколько параллельно сполняемых команд у буферов относительно друг друга
+                        //if (j > i)//если без повторов
+                        {
+                        }
+                      
+                    }
+                }
+            }
+
+            //заполнение списка коммуникаторов
+            int reqComNum = Convert.ToInt32(textBox1.Text);//требуесое кол-во коммуникаторов
+            int comToDelete = comList.Count - reqComNum;
+            for(int i = 0; i < comToDelete; i++)//распределяем буферы из лишних коммнуникаторов по коммуникаторам
+            {
+                List<int> tmpBufLst = new List<int>();
+                tmpBufLst.Clear();
+                for (int sz = 0; sz < comList[comList.IndexOf(comList.Last())].comBufList.Count; sz++)
+                {//сохраняем реализуемые этим коммуникатором буферы
+                    tmpBufLst.Add(comList[comList.IndexOf(comList.Last())].comBufList[sz]);
+                }
+                comList.RemoveAt(comList.IndexOf(comList.Last()));//удаляем коммуникатор
+                for (int j = 0; j < tmpBufLst.Count; j++)
+                {//проверяем список буферов в последнем коммуникаторе
+                    List<int> minPar = new List<int>();
+                    minPar.Clear();
+                    //проверяем параллельность с другими коммуникаторами
+                    for (int m = 0; m < comList.Count; m++)
+                    {
+                        int tmp = 0;
+                        for(int v = 0; v < comList[m].comBufList.Count; v++)
+                        {
+                            tmp += bufList[tmpBufLst[j]].allParallelsList[bufList[tmpBufLst[j]].allParallelsList.IndexOf(bufList[tmpBufLst[j]].allParallelsList.Find(x => x.oposeBuFNum == comList[m].comBufList[v]))].totalParallel;
+                        }
+                        minPar.Add(tmp);
+                    }
+                    //находим коммуникатор в котором найденный буфер
+                    int comToStoreIdx = minPar.IndexOf(minPar.Min());
+
+                    //добавляем буфер в новый коммуникатор
+                    comList[comToStoreIdx].comBufList.Add(tmpBufLst[j]);
+                    //добавляем машины в новый коммуникатор
+                    if (!comList[comToStoreIdx].connectedDPMs.Contains(bufList[tmpBufLst[j]].input))
+                    {
+                        comList[comToStoreIdx].connectedDPMs.Add(bufList[tmpBufLst[j]].input);//добавляем машины в новый коммуникатор
+                    }
+                    if (!comList[comToStoreIdx].connectedDPMs.Contains(bufList[tmpBufLst[j]].output))
+                    {
+                        comList[comToStoreIdx].connectedDPMs.Add(bufList[tmpBufLst[j]].output);//добавляем машины в новый коммуникатор
+                    }
+                    //удаляем буфер и
+
+
+                    //comList[comList.IndexOf(comList.Last())].comBufList.Remove(comList[comList.IndexOf(comList.Last())].comBufList[j]);
+                    for ( int s= 0; s < comList.Count; s++)
+                    {
+                        comList[s].connectedDPMs.Sort();
+                        comList[s].comBufList.Sort();
+                    }
+                }
+            }
+            //моделирование
+            for (int i = 0; i < comList.Count; i++)
+            {
+                comList[i].connectedDPMs.Sort();
+                comList[i].comBufList.Sort();
+            }
+            int pfmc = 0;
+            PointPairList dpmPointList = new PointPairList();//
+            PointPairList bufReadPointList = new PointPairList();//Массивы точек для каждой итерации
+            PointPairList bufWritePointList = new PointPairList();//
+            PointPairList bePointList = new PointPairList();//
+
+            List<TextObj> lablesList = new List<TextObj>();
+            List<TextObj> lablesList1 = new List<TextObj>();
+            List<TextObj> lablesList2 = new List<TextObj>();
+            //сбрасываем общие настройки
+            for (int sbs = 0; sbs < dpmList.Count; sbs++)
+            {
+                dpmList[sbs].exchangeReady = false;//При старте новой агрегации, данные в машинах сбрасываются
+                dpmList[sbs].currentTime = 0;
+                dpmList[sbs].currentCommand = 0;
+                dpmList[sbs].isBlocked = false;
+            }
+            for (int sbs = 0; sbs < bufList.Count; sbs++)//сброс данных для буферов
+            {
+                bufList[sbs].blockedDPMnum = -1;
+                bufList[sbs].dataInBuf = 0;
+                bufList[sbs].lastDataChange = 0;
+            }
+            //второй этап промоделировать до определенного момента
+            for (int circle = 0; circle < 1000; circle++)//цикл в котором происходит моделирование
+            {
+                //первый этап, машины выставляют заявки
+                for (int j = 0; j < dpmList.Count; j++)//обход каждой машины
+                {
+                    //проверка на повторное исполнение команд
+                    if (dpmList[j].currentCommand >= dpmList[j].dpmCommandList.Count)
+                    {
+                        dpmList[j].currentCommand = dpmList[j].repeatComNum;//если машина выполнила все инструкции, начинает работать с повторяемой
+                    }
+                    if (dpmList[j].exchangeReady == false)//если машина не выставила заявку на обмен
+                    {
+                        switch (dpmList[j].dpmCommandList[dpmList[j].currentCommand].commandType)//проверяем тип текущей команды машины
+                        {
+                            case "wait"://если ожидание
+                                dpmPointList.Add(dpmList[j].currentTime, j + 1, dpmList[j].currentTime + dpmList[j].dpmCommandList[dpmList[j].currentCommand].waitTime);
+                                dpmList[j].currentTime += dpmList[j].dpmCommandList[dpmList[j].currentCommand].waitTime;//если инструкция ждать, машина просто ждет
+                                dpmList[j].currentCommand++;//Выполнили команду, переходим к следующей
+                                break;
+                            case "write"://если запись
+                            case "read"://если чтение
+                                dpmList[j].exchangeReady = true;//заявка на обмен выставлена
+                                break;
+                        }
+                    }
+                }
+                //Этап второй, коммуникаторы обрабатывают заявки
+                for (int k = 0; k < comList.Count; k++)//обход каждого коммуникатора
+                {
+                    int stp = 0;
+                    int min = 0;
+                    int minIdx = 0;
+                    //опрос коммуникатором машины
+                    for (int l = 0; l < comList[k].connectedDPMs.Count; l++)//каждый коммуникатор проверяет связанные с ним машины
+                    {
+                        //если машина готова к обмену и хочет использовать именно этот коммуникатор и не заблокирована
+                        if ((dpmList[comList[k].connectedDPMs[l]].exchangeReady == true) && (comList[k].comBufList.Contains(dpmList[comList[k].connectedDPMs[l]].dpmCommandList[dpmList[comList[k].connectedDPMs[l]].currentCommand].destination)) && (dpmList[comList[k].connectedDPMs[l]].isBlocked == false))
+                        {
+                            //ищем минимальную выставленную заявку
+                            if (stp == 0)//если это первая готовая машина
+                            {
+                                minIdx = comList[k].connectedDPMs[l];//запоминаем индекс
+                                min = dpmList[comList[k].connectedDPMs[l]].currentTime;//запоминаем время
+                                stp++;
+                            }
+                            else
+                            {
+                                if (dpmList[comList[k].connectedDPMs[l]].currentTime < min)
+                                {
+                                    minIdx = comList[k].connectedDPMs[l];//запоминаем индекс
+                                    min = dpmList[comList[k].connectedDPMs[l]].currentTime;//запоминаем время
+                                }
+                            }
+                        }
+                    }
+                    if (stp > 0)//если нашли заявку нужно её отработать
+                    {
+                        //отработать удачный обмен и неудачный 
+                        switch (dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].commandType)
+                        {
+                            case "write"://если машина хочет записать информацию, проверяем что в буфере есть свободные ячейки
+                                         //вычисляем свободные ячейки в нужно буфере
+                                int freeSpace = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].bufSize - bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf;
+                                //если число свободных ячеек больше или равен чем объекм передаваемых данных
+                                if (freeSpace >= dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize)
+                                {
+                                    //проверить параллельность
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
+                                    {//если данные в буфере появились позже чем текущее время машины. "догоняем"
+                                     //эмулируем неудачный обмен
+                                     //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
+                                        dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
+                                    }
+
+                                    //в буфер записались данные
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //добавляем на график (curTime/bufNum/dataSize)
+                                    bufWritePointList.Add(dpmList[minIdx].currentTime, -dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination - 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
+                                    bufWritePointList.Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
+                                    //время машины сдвигаем
+                                    //время машины сдвигаем
+                                    dpmList[minIdx].currentTime += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //сохраняем время когда данные есть
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange = dpmList[minIdx].currentTime;
+                                    //двигаем все остальные буферы подключенные к коммуникатору на объем данных
+                                    for (int s = 0; s < comList[k].comBufList.Count; s++)
+                                    {
+                                        if (s != dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination)
+                                        {  //кроме текущего
+                                           //bufList[pereborList[i].comList[k].comBufList[s]].lastDataChange += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                            bufList[comList[k].comBufList[s]].lastDataChange = dpmList[minIdx].currentTime;
+                                        }
+                                    }
+                                    //проверям можно ли разблокировать какую-то машину
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum != -1)
+                                    {
+                                        //разблокируем машина
+                                        dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].isBlocked = false;
+                                        //нужно продвинуть время машины
+                                        //Новое текущее время заблоченной машины = curTime разлокрирубщей - curTime заблокированной
+                                        //   dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime += (dpmList[minIdx].currentTime - dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime);
+                                        //очищаем номер
+                                        bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = -1;
+                                    }
+                                    //переключаем команду дпм
+                                    dpmList[minIdx].currentCommand++;
+                                    //снимаем заявку на обмен
+                                    dpmList[minIdx].exchangeReady = false;
+                                    //фиксируем удачный обмен
+                                    pfmc++;
+                                }
+                                else//неудачная попытка обмена
+                                {
+                                    bePointList.Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
+                                    //блокируем машину
+                                    dpmList[minIdx].isBlocked = true;
+                                    //записываем номер заблокированной машины
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = minIdx;
+                                }
+                                break;
+                            case "read"://если машина хочет считать информацию, проверяем что информация есть в нужном буфере
+                                        //если число данных в буфере больше или равно объема принимаемых данных
+                                if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf >= dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize)
+                                {
+                                    //проверить параллельность
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
+                                    { //если данные в буфере появились позже чем текущее время машины. "догоняем"
+                                      //эмулируем неудачный обмен
+                                      //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
+                                        dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
+                                    }
+
+                                    //в буфере удаляются данные
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf -= dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //добавляем на график (curTime/bufNum/dataSize)
+                                    bufReadPointList.Add(dpmList[minIdx].currentTime, -dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination - 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
+                                    bufReadPointList.Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
+                                    //время машины сдвигаем
+                                    //время машины сдвигаем
+                                    dpmList[minIdx].currentTime += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                    //сохраняем время когда данные есть
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange = dpmList[minIdx].currentTime;
+                                    //двигаем все остальные буферы подключенные к коммуникатору на объем данных
+                                    for (int s = 0; s < comList[k].comBufList.Count; s++)
+                                    {
+                                        if (s != dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination)
+                                        {   //кроме текущего
+                                            //bufList[pereborList[i].comList[k].comBufList[s]].lastDataChange += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
+                                            bufList[comList[k].comBufList[s]].lastDataChange = dpmList[minIdx].currentTime;
+                                        }
+                                    }
+                                    //проверям можно ли разблокировать какую-то машину
+                                    if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum != -1)
+                                    {
+                                        //разблокируем машина
+                                        dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].isBlocked = false;
+                                        //нужно продвинуть время машины
+                                        //Новое текущее время заблоченной машины = curTime разлокрирубщей - curTime заблокированной
+                                        //   dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime += (dpmList[minIdx].currentTime - dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime);
+                                        //очищаем номер
+                                        bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = -1;
+                                    }
+                                    //переключаем команду дпм
+                                    dpmList[minIdx].currentCommand++;
+                                    //снимаем заявку на обмен
+                                    dpmList[minIdx].exchangeReady = false;
+                                    //фиксируем удачный обмен
+                                    pfmc++;
+                                }
+                                else//неудачная попытка обмена
+                                {
+                                    bePointList.Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
+                                    //блокируем машину
+                                    dpmList[minIdx].isBlocked = true;
+                                    //записываем номер заблокированной машины
+                                    bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = minIdx;
+                                }
+                                break;
+                        }
+                    }
+                }
+            }
+            HiLowBarItem bar = pane.AddHiLowBar("Ожидание", dpmPointList, Color.Black);//задаем цвет и название(опционально) каждого массива точек
+            bar.Bar.Fill = new Fill(Color.Gray);//работа машины (wait)
+
+            HiLowBarItem bar1 = pane.AddHiLowBar("Запись", bufWritePointList, Color.Red);
+            bar1.Bar.Fill = new Fill(Color.Yellow);//запись в буфер
+
+            HiLowBarItem ba2 = pane.AddHiLowBar("Чтение", bufReadPointList, Color.LightGreen);
+            ba2.Bar.Fill = new Fill(Color.FromArgb(146, 208, 80));//чтение из буфера
+
+            HiLowBarItem bar3 = pane.AddHiLowBar("Ошибка", bePointList, Color.Red);
+            bar3.Bar.Fill = new Fill(Color.Red);//запись в буфер
+
+            for (int lbl = 0; lbl < dpmPointList.Count; lbl++)
+            {
+                lablesList.Add(new TextObj(Convert.ToString(bar.Points[lbl].Z - bar.Points[lbl].X), bar.Points[lbl].X + (bar.Points[lbl].Z - bar.Points[lbl].X) / 2, bar.Points[lbl].Y));
+                lablesList[lbl].FontSpec.Fill = new Fill(Color.Gray);//цвет фона текста
+                lablesList[lbl].FontSpec.Size = 11;//размер
+                lablesList[lbl].FontSpec.Border.IsVisible = false;//выделение раниц
+                pane.GraphObjList.Add(lablesList[lbl]);//добавить текст
+            }
+            for (int lbl = 0; lbl < bufWritePointList.Count; lbl++)
+            {
+                lablesList1.Add(new TextObj(Convert.ToString(bar1.Points[lbl].Z - bar1.Points[lbl].X), bar1.Points[lbl].X + (bar1.Points[lbl].Z - bar1.Points[lbl].X) / 2, bar1.Points[lbl].Y));
+                lablesList1[lbl].FontSpec.Fill = new Fill(Color.Yellow);//цвет фона текста
+                lablesList1[lbl].FontSpec.Size = 11;//размер
+                lablesList1[lbl].FontSpec.Border.IsVisible = false;//выделение раниц
+                pane.GraphObjList.Add(lablesList1[lbl]);//добавить текст
+            }
+            for (int lbl = 0; lbl < bufReadPointList.Count; lbl++)
+            {
+                lablesList2.Add(new TextObj(Convert.ToString(ba2.Points[lbl].Z - ba2.Points[lbl].X), ba2.Points[lbl].X + (ba2.Points[lbl].Z - ba2.Points[lbl].X) / 2, ba2.Points[lbl].Y));
+                lablesList2[lbl].FontSpec.Fill = new Fill(Color.FromArgb(146, 208, 80));//цвет фона текста
+                lablesList2[lbl].FontSpec.Size = 11;//размер 
+                lablesList2[lbl].FontSpec.Border.IsVisible = false;//выделение раниц
+                pane.GraphObjList.Add(lablesList2[lbl]);//добавить текст
+            }
+            textBox2.Text += "Агрегация проведена \n";
+            for (int agr = 0; agr < comList.Count; agr++)//обходим все коммуникаторы
+            {
+                textBox2.Text += "\r\nКомуникатор " + (agr + 1) + " реализует буферы: ";
+                for (int bf = 0; bf < comList[agr].comBufList.Count; bf++)
+                {
+                    textBox2.Text += (comList[agr].comBufList[bf] + 1) + " ";
+                }
+                textBox2.Text += "\n";
+            }
+            textBox2.Text += "\r\nКол-во обменов: " + pfmc;
+            Graphics g = this.CreateGraphics();//вывод графика
+            pane.AxisChange(g);
+            g.Dispose();
+            zedGraphControl1.Refresh();
         }
 
         private void nedogruz()
@@ -2437,7 +3134,7 @@ namespace DiplomV01
             zedGraphControl1.Refresh();
         }
 
-        public void sizeOfData()
+        private void sizeOfData()
         {
             List<bool> isEnded = new List<bool>();//прошла ли машина все свои команды
             List<int> isEndedCount = new List<int>();//сколько рабочих циклов каждой машины
@@ -3000,6 +3697,17 @@ namespace DiplomV01
                             else
                             {
                                 DPMinput();
+                                break;
+                            }
+                        case "parallel":
+                            if (textBox1.TextLength == 0)
+                            {
+                                MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                break;
+                            }
+                            else
+                            {
+                                parallel();
                                 break;
                             }
                     }
