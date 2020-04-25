@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="bufClass.cs" />
+    <Compile Include="DPMConnectionClass.cs" />
     <Compile Include="nedogruzMod.cs" />
     <Compile Include="pereborMod.cs" />
     <Compile Include="dpmClass.cs" />
