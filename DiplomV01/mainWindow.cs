@@ -17,11 +17,9 @@ namespace DiplomV01
 {
     public partial class mainWindow : Form
     {
-        OpenFileDialog openFile = new OpenFileDialog();
-        String line = "";
+        OpenFileDialog openFile = new OpenFileDialog();//считывание файла
         List<dpmClass> dpmList = new List<dpmClass>();//массив машин
         List<bufClass> bufList = new List<bufClass>();//массив буферов
-        List<pereborMod> pereborList = new List<pereborMod>();//массив переборов вариантов агрегации
         GraphPane pane;
 
         public mainWindow()
@@ -37,7 +35,7 @@ namespace DiplomV01
             comboBox1.Items.Add("sizeOfData");
             comboBox1.Items.Add("connections");
             comboBox1.Items.Add("parallel");
-            comboBox1.Items.Add("piggiRoll");
+            comboBox1.Items.Add("dpmcenter");
 
             //инициализация графика
             pane = zedGraphControl1.GraphPane;//панель рисования(холст)
@@ -127,14 +125,16 @@ namespace DiplomV01
 
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        private void button1_Click(object sender, EventArgs e)//нажатие на ввод данных
         {
             try
             {
-                if (openFile.ShowDialog() == DialogResult.OK)
+                if (openFile.ShowDialog() == DialogResult.OK)//если файл открывается
                 {
+                    String line = "";
                     StreamReader sr = new StreamReader(openFile.FileName);
                     int dpmNumb = 0;
+
                     while (line != null)
                     {
                         line = sr.ReadLine();//считывает строку
@@ -210,7 +210,6 @@ namespace DiplomV01
                                             {
                                                 if (dpmList[j].inBuf[k] == i)
                                                 {
-
                                                     bufList[i - 1].output = j;
                                                 }
                                             }
@@ -230,7 +229,8 @@ namespace DiplomV01
                             }
                         }
                     }
-                    sr.Close();
+                    sr.Close();//закрыть файл
+                    button1.BackColor = Color.LightGreen;//данные ввдены, цвет кнопки сигнализирует об этом
                 }
             }
             catch
@@ -239,8 +239,9 @@ namespace DiplomV01
             }
         }
 
-        private void DPMinput()
+        private void dpmconnections()
         {
+            clearData();
             //считаем
             //число связей между машинами
             List<DPMConnectionClass> connetctionList = new List<DPMConnectionClass>();//список связанных с каждой машиной машин
@@ -531,9 +532,9 @@ namespace DiplomV01
                         comList.Add(new nedogruzMod());//создаем коммуникатор
                         //добавляем все буферы текущей соединялки
                         //добавляем в коммуникатор буферы
-                        for (int j = 0; j < connetctionList[i-1].buffers.Count; j++)
+                        for (int j = 0; j < connetctionList[i-cm].buffers.Count; j++)//-1
                         {
-                            comList[i].comBufList.Add(connetctionList[i-1].buffers[j]);//распределили буферы по коммуникаторам
+                            comList[i].comBufList.Add(connetctionList[i-cm].buffers[j]);//распределили буферы по коммуникаторам
                         }
                     }
                     //добавляем машины
@@ -550,6 +551,11 @@ namespace DiplomV01
                                 comList[j].connectedDPMs.Add(bufList[comList[j].comBufList[k]].output);
                             }
                         }
+                    }
+                    for (int s = 0; s < comList.Count; s++)
+                    {
+                        comList[s].connectedDPMs.Sort();
+                        comList[s].comBufList.Sort();
                     }
                     break;
                 case 3://если коммуникаторов меньше, чем связей
@@ -668,8 +674,12 @@ namespace DiplomV01
 
                     int[] numbers = percents1.ToArray();
                     int pilesNumber = comCount;
-                    int sum = numbers.Sum();
+                    int sum = numbers.Sum();/*
                     int combNumber = numbers.Aggregate(1, (m, number) => m * pilesNumber);
+                    if (combNumber < 0)
+                    {
+                        combNumber = combNumber * -1;//pgrll
+                    }
                     var perfectCombination =
                         Enumerable.Range(0, combNumber)
                                   .Select(x =>
@@ -685,10 +695,24 @@ namespace DiplomV01
                                       }
                                       return piles;
                                   })
-                                  .MinBy(piles => piles.Sum(pile => Math.Abs(pile.Sum() * pilesNumber - sum)));
-
+                                  .MinBy(piles => piles.Sum(pile => Math.Abs(pile.Sum() * pilesNumber - sum)));*/
                     List<List<int>> agreg = new List<List<int>>();//вариант агрегации итоговый
-                    agreg = perfectCombination.First().ToList();
+                    List<int> comPercents = new List<int>();//проценты нагруузки каждого коммуникатора
+                    for (int cmcnt = 0; cmcnt < comCount; cmcnt++)
+                    {
+                        comPercents.Add(0);//стартовая нагрузка коммуникаторов
+                        agreg.Add(new List<int>());//создание коммуникаторов
+                    }
+                    //расрпделение буферов
+                    for (int pr = 0; pr < percents1.Count; pr++)//обход каждого буфера
+                    {
+                        int cmin = comPercents.IndexOf(comPercents.Min());//находим самый свободный коммуникатор
+                                                                          //увеличиваем нагрузку на ком
+                        comPercents[cmin] += percents1[pr];
+                        //добавляем буфер в ком
+                        agreg[cmin].Add(percents1[pr]);
+                    }
+                    //agreg = perfectCombination.First().ToList();
 
                     for (int i = 0; i < comCount; i++)//каждый коммуникатор
                     {
@@ -718,6 +742,11 @@ namespace DiplomV01
                             }
                         }
                     }
+                    for (int s = 0; s < comList.Count; s++)
+                    {
+                        comList[s].connectedDPMs.Sort();
+                        comList[s].comBufList.Sort();
+                    }
                     break;
             }
             //здесь финальное моделирование
@@ -731,19 +760,7 @@ namespace DiplomV01
             List<TextObj> lablesList1 = new List<TextObj>();
             List<TextObj> lablesList2 = new List<TextObj>();
             //сбрасываем общие настройки
-            for (int sbs = 0; sbs < dpmList.Count; sbs++)
-            {
-                dpmList[sbs].exchangeReady = false;//При старте новой агрегации, данные в машинах сбрасываются
-                dpmList[sbs].currentTime = 0;
-                dpmList[sbs].currentCommand = 0;
-                dpmList[sbs].isBlocked = false;
-            }
-            for (int sbs = 0; sbs < bufList.Count; sbs++)//сброс данных для буферов
-            {
-                bufList[sbs].blockedDPMnum = -1;
-                bufList[sbs].dataInBuf = 0;
-                bufList[sbs].lastDataChange = 0;
-            }
+            dataReset();
             //второй этап промоделировать до определенного момента
             for (int circle = 0; circle < 1000; circle++)//цикл в котором происходит моделирование
             {
@@ -980,8 +997,9 @@ namespace DiplomV01
             zedGraphControl1.Refresh();
         }
         
-        private void pigroll()
+        private void dpmcenter()
         {
+            clearData();
             List<dpmEnterclass> dpmEntersList = new List<dpmEnterclass>();//список входов машин
             for (int i = 0; i < dpmList.Count; i++)//для каждой машины
             {
@@ -1422,11 +1440,12 @@ namespace DiplomV01
             zedGraphControl1.Refresh();
         }
     
-        private void modelPerebor()
+        private void modelPerebor()//моделирование перебором
         {
+            clearData();
+            List<pereborMod> pereborList = new List<pereborMod>();//Список содержащий все варианты агрегации схемы
             int comNumb = Convert.ToInt32(textBox1.Text);//число коммуникаторов
-            int agregNumb = GetStarling(bufList.Count, comNumb);//получаем число разбиений
-            int bellNumb = bellNumber(bufList.Count); //получаем число белла
+            int agregNumb = GetStarling(bufList.Count, comNumb);//число всех возможных агрегаций при заданном числе коммуникаторов
             for (int i = 0; i < agregNumb; i++)
             {
                 pereborList.Add(new pereborMod());
@@ -1440,7 +1459,6 @@ namespace DiplomV01
             {
                 nums[i] = i;
             }
-            //IEnumerable<string[][]> resultSets1 = Partitioning.GetAllPartitions(new[] { "a", "b", "c" });
             IEnumerable<int[][]> resultSets = Partitioning.GetAllPartitions(nums);//получаем ВСЕ разбиения
             int[][][] preConvertInts = resultSets.Select(x => x.ToArray()).ToArray();//конвертирует ienumerable в обычный массив
             int indexPerebora = 0;//число переборов
@@ -1458,12 +1476,15 @@ namespace DiplomV01
                     indexPerebora++;
                 }
             }
-            //Выявление подключенных к каждому коммуникатору машин
+            //очистка памяти
+            Array.Clear(nums, 0, nums.Length);
+            Array.Clear(preConvertInts, 0, preConvertInts.Length);
+            //заполнение списка обслуживаемых машин у каждого коммуникатора
             for (int i = 0; i < agregNumb; i++)//для каждого варианта агрегации
             {
                 for (int j = 0; j < comNumb; j++)//для каждого коммуникатора
                 {
-                    for (int k = 0; k < pereborList[i].comList[j].comBufList.Count; k++)//каждый коммуникатор реализаует минимум один буфер, обходим все
+                    for (int k = 0; k < pereborList[i].comList[j].comBufList.Count; k++)//обход буферов каждого коммуникатора
                     {
                         if (!pereborList[i].comList[j].connectedDPMs.Exists((x) => x == bufList[pereborList[i].comList[j].comBufList[k]].input))
                         {
@@ -1476,38 +1497,10 @@ namespace DiplomV01
                     }
                 }
             }
-            //Инициализция графиков
-            List<PointPairList> dpmPointList = new List<PointPairList>();//
-            List<PointPairList> bufReadPointList = new List<PointPairList>();// Массивы точек для каждой итерации
-            List<PointPairList> bufWritePointList = new List<PointPairList>();//
-
-            List<PointPairList> bePointList = new List<PointPairList>();//
-
-            List<TextObj> lablesList = new List<TextObj>();
-            List<TextObj> lablesList1 = new List<TextObj>();
-            List<TextObj> lablesList2 = new List<TextObj>();
-
             for (int i = 0; i < agregNumb; i++)//моделирование проводится для каждой возможной агрегации
             {
-                //Инициализация массивов точек для каждой возможной агрегации
-                dpmPointList.Add(new PointPairList());//
-                bufReadPointList.Add(new PointPairList());//Добавляем для каждой итерации свой экземпляр массива
-                bufWritePointList.Add(new PointPairList());//
-                bePointList.Add(new PointPairList());
-                //сбрасываем общие настройки
-                for (int sbs = 0; sbs < dpmList.Count; sbs++)
-                {
-                    dpmList[sbs].exchangeReady = false;//При старте новой агрегации, данные в машинах сбрасываются
-                    dpmList[sbs].currentTime = 0;
-                    dpmList[sbs].currentCommand = 0;
-                    dpmList[sbs].isBlocked = false;
-                }
-                for (int sbs = 0; sbs < bufList.Count; sbs++)//сброс данных для буферов
-                {
-                    bufList[sbs].blockedDPMnum = -1;
-                    bufList[sbs].dataInBuf = 0;
-                    bufList[sbs].lastDataChange = 0;
-                }
+                //сброс общих настроек
+                dataReset();
                 for (int circle = 0; circle < 1000; circle++)//цикл в котором происходит моделирование
                 {
                     //первый этап, машины выставляют заявки
@@ -1523,7 +1516,6 @@ namespace DiplomV01
                             switch (dpmList[j].dpmCommandList[dpmList[j].currentCommand].commandType)//проверяем тип текущей команды машины
                             {
                                 case "wait"://если ожидание
-                                    dpmPointList[0].Add(dpmList[j].currentTime, j + 1, dpmList[j].currentTime + dpmList[j].dpmCommandList[dpmList[j].currentCommand].waitTime);//добавляем на график
                                     dpmList[j].currentTime += dpmList[j].dpmCommandList[dpmList[j].currentCommand].waitTime;//если инструкция ждать, машина просто ждет
                                     dpmList[j].currentCommand++;//Выполнили команду, переходим к следующей
                                     break;
@@ -1532,8 +1524,6 @@ namespace DiplomV01
                                     dpmList[j].exchangeReady = true;//заявка на обмен выставлена
                                     break;
                             }
-                            //(перенести, чтобы коммуникатор это делал, по заверешению операции)
-                            //dpmList[j].currentCommand++;//после  обработки команды ставим указатель на следующую 
                         }
                     }
                     //Этап второй, коммуникаторы обрабатывают заявки
@@ -1579,16 +1569,11 @@ namespace DiplomV01
                                         //проверить параллельность
                                         if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
                                         {//если данные в буфере появились позже чем текущее время машины. "догоняем"
-                                            //эмулируем неудачный обмен
-                                            //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
                                             dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
                                         }
 
                                         //в буфер записались данные
                                         bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
-                                        //добавляем на график (curTime/bufNum/dataSize)
-                                        bufWritePointList[0].Add(dpmList[minIdx].currentTime, -dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination - 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
-                                        bufWritePointList[0].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
                                         //время машины сдвигаем
                                         dpmList[minIdx].currentTime += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
                                         //сохраняем время когда данные есть
@@ -1618,11 +1603,10 @@ namespace DiplomV01
                                         //снимаем заявку на обмен
                                         dpmList[minIdx].exchangeReady = false;
                                         //фиксируем удачный обмен
-                                        pereborList[i].performance++;
+                                        pereborList[i].exchangeCount++;
                                     }
                                     else//неудачная попытка обмена
                                     {
-                                        bePointList[0].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
                                         //блокируем машину
                                         dpmList[minIdx].isBlocked = true;
                                         //записываем номер заблокированной машины
@@ -1636,16 +1620,11 @@ namespace DiplomV01
                                         //проверить параллельность
                                         if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
                                         { //если данные в буфере появились позже чем текущее время машины. "догоняем"
-                                            //эмулируем неудачный обмен
-                                            //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
                                             dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
                                         }
 
                                         //в буфере удаляются данные
                                         bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].dataInBuf -= dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
-                                        //добавляем на график (curTime/bufNum/dataSize)
-                                        bufReadPointList[0].Add(dpmList[minIdx].currentTime, -dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination - 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
-                                        bufReadPointList[0].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize);
                                         //время машины сдвигаем
                                         dpmList[minIdx].currentTime += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
                                         //сохраняем время когда данные есть
@@ -1655,7 +1634,6 @@ namespace DiplomV01
                                         {
                                             if (s != dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination)
                                             {   //кроме текущего
-                                                //bufList[pereborList[i].comList[k].comBufList[s]].lastDataChange += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
                                                 bufList[pereborList[i].comList[k].comBufList[s]].lastDataChange = dpmList[minIdx].currentTime;
                                             }
                                         }
@@ -1664,9 +1642,6 @@ namespace DiplomV01
                                         {
                                             //разблокируем машина
                                             dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].isBlocked = false;
-                                            //нужно продвинуть время машины
-                                            //Новое текущее время заблоченной машины = curTime разлокрирубщей - curTime заблокированной
-                                            //   dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime += (dpmList[minIdx].currentTime - dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime);
                                             //очищаем номер
                                             bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = -1;
                                         }
@@ -1675,11 +1650,10 @@ namespace DiplomV01
                                         //снимаем заявку на обмен
                                         dpmList[minIdx].exchangeReady = false;
                                         //фиксируем удачный обмен
-                                        pereborList[i].performance++;
+                                        pereborList[i].exchangeCount++;
                                     }
                                     else//неудачная попытка обмена
                                     {
-                                        bePointList[0].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
                                         //блокируем машину
                                         dpmList[minIdx].isBlocked = true;
                                         //записываем номер заблокированной машины
@@ -1689,43 +1663,27 @@ namespace DiplomV01
                             }
                         }
                     }
-                    //requests();//создание заявок, заполнение дескрипторов
-                    //reqproc();//поиск заявки с которой будет работаеть коммуникатор
-                    //exchange();//обмен
                 }
-                // break;//для одной агрегации
-                //очищаем массив точек
-
-                pereborList[i].time = dpmList.Max(x => x.currentTime);
-
-                dpmPointList.Clear();
-                bufReadPointList.Clear();
-                bufWritePointList.Clear();
-                bePointList.Clear();
             }
             //РИСОВАНИЕ
-            //находим индекс перебора где больше всего обменов выполнено
-            int drowIdx = pereborList.FindIndex(r => r.performance == pereborList.Max(x => x.performance));
-
+            //находим номер перебора, в котором было выполнено больше всего обменов
+            int drowIdx = pereborList.FindIndex(r => r.exchangeCount == pereborList.Max(x => x.exchangeCount));
+            //Инициализция графиков
+            //массивы точек
+            List<PointPairList> dpmPointList = new List<PointPairList>();
+            List<PointPairList> bufReadPointList = new List<PointPairList>();
+            List<PointPairList> bufWritePointList = new List<PointPairList>();
+            List<PointPairList> bePointList = new List<PointPairList>();
+            List<TextObj> lablesList = new List<TextObj>();
+            List<TextObj> lablesList1 = new List<TextObj>();
+            List<TextObj> lablesList2 = new List<TextObj>();
             //сюда добавить повторное моделирование, чтобы нарисовать
             dpmPointList.Add(new PointPairList());//
             bufReadPointList.Add(new PointPairList());//Добавляем для каждой итерации свой экземпляр массива
             bufWritePointList.Add(new PointPairList());//
             bePointList.Add(new PointPairList());
             //сбрасываем общие настройки
-            for (int sbs = 0; sbs < dpmList.Count; sbs++)
-            {
-                dpmList[sbs].exchangeReady = false;//При старте новой агрегации, данные в машинах сбрасываются
-                dpmList[sbs].currentTime = 0;
-                dpmList[sbs].currentCommand = 0;
-                dpmList[sbs].isBlocked = false;
-            }
-            for (int sbs = 0; sbs < bufList.Count; sbs++)//сброс данных для буферов
-            {
-                bufList[sbs].blockedDPMnum = -1;
-                bufList[sbs].dataInBuf = 0;
-                bufList[sbs].lastDataChange = 0;
-            }
+            dataReset();
             for (int circle = 0; circle < 1000; circle++)//цикл в котором происходит моделирование
             {
                 //первый этап, машины выставляют заявки
@@ -1750,8 +1708,6 @@ namespace DiplomV01
                                 dpmList[j].exchangeReady = true;//заявка на обмен выставлена
                                 break;
                         }
-                        //(перенести, чтобы коммуникатор это делал, по заверешению операции)
-                        //dpmList[j].currentCommand++;//после  обработки команды ставим указатель на следующую 
                     }
                 }
                 //Этап второй, коммуникаторы обрабатывают заявки
@@ -1797,8 +1753,6 @@ namespace DiplomV01
                                     //проверить параллельность
                                     if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
                                     {//если данные в буфере появились позже чем текущее время машины. "догоняем"
-                                     //эмулируем неудачный обмен
-                                     //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
                                         dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
                                     }
 
@@ -1825,9 +1779,6 @@ namespace DiplomV01
                                     {
                                         //разблокируем машина
                                         dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].isBlocked = false;
-                                        //нужно продвинуть время машины
-                                        //Новое текущее время заблоченной машины = curTime разлокрирубщей - curTime заблокированной
-                                        //   dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime += (dpmList[minIdx].currentTime - dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime);
                                         //очищаем номер
                                         bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = -1;
                                     }
@@ -1835,8 +1786,6 @@ namespace DiplomV01
                                     dpmList[minIdx].currentCommand++;
                                     //снимаем заявку на обмен
                                     dpmList[minIdx].exchangeReady = false;
-                                    //фиксируем удачный обмен
-                                    //pereborList[drowIdx].performance++;
                                 }
                                 else//неудачная попытка обмена
                                 {
@@ -1854,8 +1803,6 @@ namespace DiplomV01
                                     //проверить параллельность
                                     if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange > dpmList[minIdx].currentTime)
                                     { //если данные в буфере появились позже чем текущее время машины. "догоняем"
-                                      //эмулируем неудачный обмен
-                                      //bePointList[i].Add(dpmList[minIdx].currentTime, minIdx + 1, dpmList[minIdx].currentTime + 1);
                                         dpmList[minIdx].currentTime = bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].lastDataChange;
                                     }
 
@@ -1873,18 +1820,14 @@ namespace DiplomV01
                                     {
                                         if (s != dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination)
                                         {   //кроме текущего
-                                            //bufList[pereborList[i].comList[k].comBufList[s]].lastDataChange += dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].dataSize;
                                             bufList[pereborList[drowIdx].comList[k].comBufList[s]].lastDataChange = dpmList[minIdx].currentTime;
                                         }
                                     }
                                     //проверям можно ли разблокировать какую-то машину
                                     if (bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum != -1)
                                     {
-                                        //разблокируем машина
+                                        //разблокируем машину
                                         dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].isBlocked = false;
-                                        //нужно продвинуть время машины
-                                        //Новое текущее время заблоченной машины = curTime разлокрирубщей - curTime заблокированной
-                                        //   dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime += (dpmList[minIdx].currentTime - dpmList[bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum].currentTime);
                                         //очищаем номер
                                         bufList[dpmList[minIdx].dpmCommandList[dpmList[minIdx].currentCommand].destination].blockedDPMnum = -1;
                                     }
@@ -1892,8 +1835,6 @@ namespace DiplomV01
                                     dpmList[minIdx].currentCommand++;
                                     //снимаем заявку на обмен
                                     dpmList[minIdx].exchangeReady = false;
-                                    //фиксируем удачный обмен
-                                    //pereborList[i].performance++;
                                 }
                                 else//неудачная попытка обмена
                                 {
@@ -1909,9 +1850,6 @@ namespace DiplomV01
                 }
             }
 
-
-
-
             HiLowBarItem bar = pane.AddHiLowBar("Ожидание", dpmPointList[0], Color.Black);//задаем цвет и название(опционально) каждого массива точек
             bar.Bar.Fill = new Fill(Color.Gray);//работа машины (wait)
 
@@ -1923,7 +1861,6 @@ namespace DiplomV01
 
             HiLowBarItem bar3 = pane.AddHiLowBar("Ошибка", bePointList[0], Color.Red);
             bar3.Bar.Fill = new Fill(Color.Red);//запись в буфер
-
 
             for (int lbl = 0; lbl < dpmPointList[0].Count; lbl++)
             {
@@ -1959,6 +1896,7 @@ namespace DiplomV01
                 }
                 textBox2.Text += "\n";
             }
+            textBox2.Text += "\r\nКол-во обменов: " + pereborList[drowIdx].exchangeCount;
             Graphics g = this.CreateGraphics();//вывод графика
             pane.AxisChange(g);
             g.Dispose();
@@ -1982,18 +1920,17 @@ namespace DiplomV01
                         sb.Append((pereborList[s].comList[cm].comBufList[bf] + 1) + " ");
                     }
                 }
-                sb.Append("\r\nКол-во совершенных обменов: " + pereborList[s].performance);
-                sb.Append("\r\nВремя: " + pereborList[s].time);
+                sb.Append("\r\nКол-во совершенных обменов: " + pereborList[s].exchangeCount);
                 sb.Append("\n");
             }
 
             File.AppendAllText(filePath + "log.txt", sb.ToString());
-            sb.Clear();
-
+            sb.Clear();//очистка памяти
         }
 
         private void parallel()
         {
+            clearData();
             //моделирование когда число коммуникаторов = число буферов
             //первый этап, каждый внешний буфер реализуется отдельным коммуникатором
             List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
@@ -2530,6 +2467,7 @@ namespace DiplomV01
 
         private void nedogruz()
         {
+            clearData();
             //первый этап, каждый внешний буфер реализуется отдельным коммуникатором
             List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
             for(int i = 0; i < bufList.Count; i++)
@@ -2556,20 +2494,8 @@ namespace DiplomV01
             while (comList.Count != reqComNum)//общий цикл
             {//крутится, пока число коммуникаторов не будет равно заданному
                 //сбрасываем общие настройки
-                for (int sbs = 0; sbs < dpmList.Count; sbs++)
-                {
-                    dpmList[sbs].exchangeReady = false;//При старте новой агрегации, данные в машинах сбрасываются
-                    dpmList[sbs].currentTime = 0;
-                    dpmList[sbs].currentCommand = 0;
-                    dpmList[sbs].isBlocked = false;
-                }
-                for (int sbs = 0; sbs < bufList.Count; sbs++)//сброс данных для буферов
-                {
-                    bufList[sbs].blockedDPMnum = -1;
-                    bufList[sbs].dataInBuf = 0;
-                    bufList[sbs].lastDataChange = 0;
-                }
-                for(int i = 0; i < comList.Count;i++)
+                dataReset();
+                for (int i = 0; i < comList.Count;i++)
                 {
                     comList[i].performance = 0;
                 }
@@ -2797,19 +2723,7 @@ namespace DiplomV01
             List<TextObj> lablesList1 = new List<TextObj>();
             List<TextObj> lablesList2 = new List<TextObj>();
             //сбрасываем общие настройки
-            for (int sbs = 0; sbs < dpmList.Count; sbs++)
-            {
-                dpmList[sbs].exchangeReady = false;//При старте новой агрегации, данные в машинах сбрасываются
-                dpmList[sbs].currentTime = 0;
-                dpmList[sbs].currentCommand = 0;
-                dpmList[sbs].isBlocked = false;
-            }
-            for (int sbs = 0; sbs < bufList.Count; sbs++)//сброс данных для буферов
-            {
-                bufList[sbs].blockedDPMnum = -1;
-                bufList[sbs].dataInBuf = 0;
-                bufList[sbs].lastDataChange = 0;
-            }
+            dataReset();
             //второй этап промоделировать до определенного момента
             for (int circle = 0; circle < 1000; circle++)//цикл в котором происходит моделирование
             {
@@ -3048,6 +2962,7 @@ namespace DiplomV01
 
         private void sizeOfData()
         {
+            clearData();
             List<bool> isEnded = new List<bool>();//прошла ли машина все свои команды
             List<int> isEndedCount = new List<int>();//сколько рабочих циклов каждой машины
             for (int i = 0; i < dpmList.Count; i++)
@@ -3148,9 +3063,15 @@ namespace DiplomV01
             int comCount = Convert.ToInt32(textBox1.Text);//кол-во коммуникаторов
             //распределять буферы по коммуникаторам в зависимости от их % важности
             int[] numbers = percentList.ToArray();
+            UInt64[] longs = numbers.Select(item => (UInt64)item).ToArray();
             int pilesNumber = comCount;
-            int sum = numbers.Sum();
-            int combNumber = numbers.Aggregate(1, (m, number) => m * pilesNumber);
+            int sum = numbers.Sum();/*
+            int combNumber =numbers.Aggregate(1, (m, number) => m * pilesNumber);
+            UInt64 combNumberLng = (UInt64)longs.Aggregate(1, (m, number) => m * pilesNumber);//число вохможных варантов
+            if (combNumber < 0)
+            {
+                combNumber = combNumber * -1;//pgrll
+            }
             var perfectCombination =
                 Enumerable.Range(0, combNumber)
                           .Select(x =>
@@ -3166,10 +3087,24 @@ namespace DiplomV01
                               }
                               return piles;
                           })
-                          .MinBy(piles => piles.Sum(pile => Math.Abs(pile.Sum() * pilesNumber - sum)));
-
+                          .MinBy(piles => piles.Sum(pile => Math.Abs(pile.Sum() * pilesNumber - sum)));*/
             List<List<int>> agreg = new List<List<int>>();//вариант агрегации итоговый
-            agreg = perfectCombination.First().ToList();
+            List<int> comPercents = new List<int>();//проценты нагруузки каждого коммуникатора
+            for (int cmcnt = 0; cmcnt < comCount; cmcnt++)
+            {
+                comPercents.Add(0);//стартовая нагрузка коммуникаторов
+                agreg.Add(new List<int>());//создание коммуникаторов
+            }
+            //расрпделение буферов
+            for (int pr = 0; pr < percentList.Count; pr++)//обход каждого буфера
+            {
+                int cmin = comPercents.IndexOf(comPercents.Min());//находим самый свободный коммуникатор
+                //увеличиваем нагрузку на ком
+                comPercents[cmin] += percentList[pr];
+                //добавляем буфер в ком
+                agreg[cmin].Add(percentList[pr]);
+            }
+            //agreg = perfectCombination.First().ToList();//закоментить
             //подключенные к коммуникатору машины
             List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
             for(int i = 0; i < comCount; i++)//каждый коммуникатор
@@ -3457,36 +3392,31 @@ namespace DiplomV01
             zedGraphControl1.Refresh();
         }
 
-        public static Int32 GetPercent(Int32 a, Int32 b)//Процент от числа
+        private void dataReset()//сброс данных для машин и буферов
+        {
+            for (int sbs = 0; sbs < dpmList.Count; sbs++)//сброс данных для машин
+            {
+                dpmList[sbs].exchangeReady = false;
+                dpmList[sbs].currentTime = 0;
+                dpmList[sbs].currentCommand = 0;
+                dpmList[sbs].isBlocked = false;
+            }
+            for (int sbs = 0; sbs < bufList.Count; sbs++)//сброс данных для буферов
+            {
+                bufList[sbs].blockedDPMnum = -1;
+                bufList[sbs].dataInBuf = 0;
+                bufList[sbs].lastDataChange = 0;
+            }
+        }
+
+        public static Int32 GetPercent(Int32 a, Int32 b)//получить процент от числа
         {
             if (b == 0) return 0;
 
             return (Int32)(a / (b / 100M));
         }
 
-        public static int bellNumber(int n)//считает число белла
-        {
-            int[,] bell = new int[n + 1,
-                                  n + 1];
-            bell[0, 0] = 1;
-
-            for (int i = 1; i <= n; i++)
-            {
-
-                // Explicitly fill for j = 0 
-                bell[i, 0] = bell[i - 1, i - 1];
-
-                // Fill for remaining values of j 
-                for (int j = 1; j <= i; j++)
-                    bell[i, j] = bell[i - 1, j - 1] +
-                                 bell[i, j - 1];
-            }
-
-            return bell[n, 0];
-        }
-
-
-        public static class Partitioning//возвращает все возможные переборы
+        public static class Partitioning//Класс разбиений
         {
             public static IEnumerable<T[][]> GetAllPartitions<T>(T[] elements)
             {
@@ -3514,7 +3444,6 @@ namespace DiplomV01
                     }
                 }
             }
-
             private static IEnumerable<Tuple<T[], T[]>> GetTuplePartitions<T>(
                 T[] elements)
             {
@@ -3540,9 +3469,7 @@ namespace DiplomV01
             }
         }
 
-
-
-        public static int GetStarling(int n, int k)//возвращает число стирлинга
+        public static int GetStarling(int n, int k)//получить число стирлинга второго рода
         {
             if (n == k)
                 return 1;  // S(n,n) = 1
@@ -3551,7 +3478,7 @@ namespace DiplomV01
             return GetStarling(n - 1, k - 1) + k * GetStarling(n - 1, k);
         }
 
-        private void button3_Click(object sender, EventArgs e)
+        private void button3_Click(object sender, EventArgs e)//по нажатию моделировать
         {
             if (dpmList.Count < 1)
             {
@@ -3565,80 +3492,93 @@ namespace DiplomV01
                 }
                 else
                 {
-                    switch (comboBox1.SelectedItem)
+                    if(Convert.ToInt32(textBox1.Text) > bufList.Count)
                     {
-                        case "Перебор":
-                            if (textBox1.TextLength == 0)
-                            {
-                                MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                break;
-                            }
-                            else
-                            {
-                                modelPerebor();
-                                break;
-                            }
-                        case "Удалять недогруженные":
-                            if (textBox1.TextLength == 0)
-                            {
-                                MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                break;
-                            }
-                            else
-                            {
-                                nedogruz();
-                                break;
-                            }                        
-                        case "sizeOfData":
-                            if (textBox1.TextLength == 0)
-                            {
-                                MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                break;
-                            }
-                            else
-                            {
-                                sizeOfData();
-                                break;
-                            }
-                        case "connections":
-                            if (textBox1.TextLength == 0)
-                            {
-                                MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                break;
-                            }
-                            else
-                            {
-                                DPMinput();
-                                break;
-                            }
-                        case "parallel":
-                            if (textBox1.TextLength == 0)
-                            {
-                                MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                break;
-                            }
-                            else
-                            {
-                                parallel();
-                                break;
-                            }                        
-                        case "piggiRoll":
-                            if (textBox1.TextLength == 0)
-                            {
-                                MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                break;
-                            }
-                            else
-                            {
-                                pigroll();
-                                break;
-                            }
+                        MessageBox.Show("Количество коммуникаторов не может превосходить количество буферов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        switch (comboBox1.SelectedItem)
+                        {
+                            case "Перебор":
+                                if (textBox1.TextLength == 0)
+                                {
+                                    MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    break;
+                                }
+                                else
+                                {
+                                    modelPerebor();
+                                    break;
+                                }
+                            case "Удалять недогруженные":
+                                if (textBox1.TextLength == 0)
+                                {
+                                    MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    break;
+                                }
+                                else
+                                {
+                                    nedogruz();
+                                    break;
+                                }
+                            case "sizeOfData":
+                                if (textBox1.TextLength == 0)
+                                {
+                                    MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    break;
+                                }
+                                else
+                                {
+                                    sizeOfData();
+                                    break;
+                                }
+                            case "connections":
+                                if (textBox1.TextLength == 0)
+                                {
+                                    MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    break;
+                                }
+                                else
+                                {
+                                    dpmconnections();
+                                    break;
+                                }
+                            case "parallel":
+                                if (textBox1.TextLength == 0)
+                                {
+                                    MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    break;
+                                }
+                                else
+                                {
+                                    parallel();
+                                    break;
+                                }
+                            case "dpmcenter":
+                                if (textBox1.TextLength == 0)
+                                {
+                                    MessageBox.Show("Введите кол-во коммуникаторов", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    break;
+                                }
+                                else
+                                {
+                                    dpmcenter();
+                                    break;
+                                }
+                        }
                     }
                 }
             }
         }
 
-        private void textBox1_KeyPress(object sender, KeyPressEventArgs e)
+        private void clearData()
+        {
+            zedGraphControl1.GraphPane.CurveList.Clear();
+            zedGraphControl1.GraphPane.GraphObjList.Clear();
+            textBox2.Clear();
+        }
+        private void textBox1_KeyPress(object sender, KeyPressEventArgs e)//ввод числа коммуникаторов
         {
             if ((e.KeyChar >= '0') && (e.KeyChar <= '9'))
             {

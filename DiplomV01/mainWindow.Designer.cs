@@ -35,6 +35,7 @@
             this.zedGraphControl1 = new ZedGraph.ZedGraphControl();
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.textBox2 = new System.Windows.Forms.TextBox();
+            this.label1 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // button1
@@ -57,7 +58,7 @@
             // 
             // button3
             // 
-            this.button3.Location = new System.Drawing.Point(12, 68);
+            this.button3.Location = new System.Drawing.Point(12, 107);
             this.button3.Name = "button3";
             this.button3.Size = new System.Drawing.Size(137, 23);
             this.button3.TabIndex = 4;
@@ -82,7 +83,7 @@
             // 
             // textBox1
             // 
-            this.textBox1.Location = new System.Drawing.Point(12, 97);
+            this.textBox1.Location = new System.Drawing.Point(12, 81);
             this.textBox1.Name = "textBox1";
             this.textBox1.Size = new System.Drawing.Size(137, 20);
             this.textBox1.TabIndex = 6;
@@ -96,11 +97,21 @@
             this.textBox2.Size = new System.Drawing.Size(137, 200);
             this.textBox2.TabIndex = 7;
             // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Location = new System.Drawing.Point(12, 65);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(128, 13);
+            this.label1.TabIndex = 8;
+            this.label1.Text = "Число коммуникаторов";
+            // 
             // mainWindow
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1904, 1041);
+            this.Controls.Add(this.label1);
             this.Controls.Add(this.textBox2);
             this.Controls.Add(this.textBox1);
             this.Controls.Add(this.zedGraphControl1);
@@ -124,6 +135,7 @@
         private ZedGraph.ZedGraphControl zedGraphControl1;
         private System.Windows.Forms.TextBox textBox1;
         private System.Windows.Forms.TextBox textBox2;
+        private System.Windows.Forms.Label label1;
     }
 }
 
