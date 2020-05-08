@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DiplomV01
 {
-    class pereborMod
+    class agrStruct
     {
         public class comClass//класс описывающий коммуникатор
         {

@@ -348,14 +348,14 @@ namespace DiplomV01
             {
                 menu = 3;
             }
-            List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
+            List<comRemove> comList = new List<comRemove>();//список коммуникаторов
             switch (menu)
             {
                 case 1://если предпологаемое число коммуникаторов = число связей между машинами
                        //каждый коммуникатор реализует одну связь
                     for (int i = 0; i < comCount; i++)//каждый коммуникатор
                     {
-                        comList.Add(new nedogruzMod());//создаем коммуникатор
+                        comList.Add(new comRemove());//создаем коммуникатор
                         //добавляем все буферы текущей соединялки
                         //добавляем в коммуникатор буферы
                         for (int j = 0; j < connetctionList[i].buffers.Count; j++)
@@ -502,7 +502,7 @@ namespace DiplomV01
                         int idxofMaxConnection = percents.IndexOf(percents.Max());//индекс самой нагруженной связи
                         int bcount = connetctionList[idxofMaxConnection].buffers.Count;//кол-во буферов в выбранной связи
                         int del = bcount / 2;//сколько буферов забрать
-                        comList.Add(new nedogruzMod());//создали com
+                        comList.Add(new comRemove());//создали com
                         for (int z = 0; z < del; z++)//заполняем коммуникатор буферами
                         {
                             //поиск самого "тяжелого" буфера
@@ -529,7 +529,7 @@ namespace DiplomV01
                     //распределение остальных коммуникаторов
                     for (int i = cm; i < comCount; i++)//каждый коммуникатор
                     {
-                        comList.Add(new nedogruzMod());//создаем коммуникатор
+                        comList.Add(new comRemove());//создаем коммуникатор
                         //добавляем все буферы текущей соединялки
                         //добавляем в коммуникатор буферы
                         for (int j = 0; j < connetctionList[i-cm].buffers.Count; j++)//-1
@@ -716,7 +716,7 @@ namespace DiplomV01
 
                     for (int i = 0; i < comCount; i++)//каждый коммуникатор
                     {
-                        comList.Add(new nedogruzMod());//создаем коммуникатор
+                        comList.Add(new comRemove());//создаем коммуникатор
                                                        //добавляем в коммуникатор буферы
                         for (int j = 0; j < agreg[i].Count; j++)
                         {
@@ -748,6 +748,11 @@ namespace DiplomV01
                         comList[s].comBufList.Sort();
                     }
                     break;
+            }
+            for (int i = 0; i < comList.Count; i++)
+            {
+                comList[i].connectedDPMs.Sort();
+                comList[i].comBufList.Sort();
             }
             //здесь финальное моделирование
             int pfmc = 0;
@@ -999,6 +1004,7 @@ namespace DiplomV01
         
         private void dpmcenter()
         {
+            dataReset();
             clearData();
             List<dpmEnterclass> dpmEntersList = new List<dpmEnterclass>();//список входов машин
             for (int i = 0; i < dpmList.Count; i++)//для каждой машины
@@ -1029,7 +1035,7 @@ namespace DiplomV01
             {
                 menu = 3;
             }
-            List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
+            List<comRemove> comList = new List<comRemove>();//список коммуникаторов
 
             switch (menu)
             {
@@ -1037,7 +1043,7 @@ namespace DiplomV01
                        //каждый коммуникатор реализует одну связь
                     for (int i = 0; i < comCount; i++)//каждый коммуникатор
                     {
-                        comList.Add(new nedogruzMod());//создаем коммуникатор
+                        comList.Add(new comRemove());//создаем коммуникатор
                         //добавляем все буферы текущей соединялки
                         //добавляем в коммуникатор буферы
                         for (int j = 0; j < dpmEntersList[i].dpmEnterBuffers.Count; j++)
@@ -1078,7 +1084,7 @@ namespace DiplomV01
                         }
                         //добавялем буферы из самого нагруженного входа в отдельный коммуникатор
                         int bufToMove = dpmEntersList[maxIdx].dpmEnterBuffers.Count / 2;//сколько буферов перенесте
-                        comList.Add(new nedogruzMod());//создаем коммуникатор
+                        comList.Add(new comRemove());//создаем коммуникатор
                         for (int btm = 0; btm < bufToMove; btm++)
                         {
 
@@ -1092,11 +1098,45 @@ namespace DiplomV01
                     //распределяем остальные коммуникаторы
                     for(int cm = 0; cm < dpmEntersList.Count; cm++)
                     {
-                        comList.Add(new nedogruzMod());
+                        comList.Add(new comRemove());
                         for(int bcnt = 0; bcnt < dpmEntersList[cm].dpmEnterBuffers.Count; bcnt++)
                         {
                             //добавляем в коммуникатор буферы
                             comList[comList.Count - 1].comBufList.Add(dpmEntersList[cm].dpmEnterBuffers[bcnt]);
+                        }
+                    }
+                    //pgrll проверка
+                    int pgcnt = 0;
+                    for(int pg = 0; pg < comCount; pg++)//обход коммуникаторов
+                    {
+                        if (comList[pg].comBufList.Count == 0)
+                        {
+                            pgcnt++;
+                        }
+                    }
+                    for(int ept = 0; ept < pgcnt; ept++)//если есть пустые
+                    {
+                        for (int pg = 0; pg < comCount; pg++)//находим пустой
+                        {
+                            if (comList[pg].comBufList.Count == 0)//когда нашли
+                            {
+                                int maxnumb = 0;
+                                int maxnumbIdx = 0;
+                                for(int maxsrch = 0; maxsrch < comCount; maxsrch++)//поиск самного нагруженного
+                                {
+                                    if (comList[maxsrch].comBufList.Count > maxnumb)
+                                    {
+                                        maxnumb = comList[maxsrch].comBufList.Count;
+                                        maxnumbIdx = maxsrch;
+                                    }
+                                }
+                                //перенос половины из самого нагруженного в пустой
+                                for(int store = 0;store< maxnumb/2;store++)
+                                {
+                                    comList[pg].comBufList.Add(comList[maxnumbIdx].comBufList[store]);
+                                    comList[maxnumbIdx].comBufList.RemoveAt(store);
+                                }
+                            }
                         }
                     }
                     //добавляем машины
@@ -1156,7 +1196,7 @@ namespace DiplomV01
                     //распределяем остальные коммуникаторы
                     for (int cm = 0; cm < dpmEntersList.Count; cm++)
                     {
-                        comList.Add(new nedogruzMod());
+                        comList.Add(new comRemove());
                         for (int bcnt = 0; bcnt < dpmEntersList[cm].dpmEnterBuffers.Count; bcnt++)
                         {
                             //добавляем в коммуникатор буферы
@@ -1179,6 +1219,11 @@ namespace DiplomV01
                         }
                     }
                     break;
+            }
+            for (int i = 0; i < comList.Count; i++)
+            {
+                comList[i].connectedDPMs.Sort();
+                comList[i].comBufList.Sort();
             }
             //здесь финальное моделирование
             int pfmc = 0;
@@ -1443,15 +1488,15 @@ namespace DiplomV01
         private void modelPerebor()//моделирование перебором
         {
             clearData();
-            List<pereborMod> pereborList = new List<pereborMod>();//Список содержащий все варианты агрегации схемы
+            List<agrStruct> pereborList = new List<agrStruct>();//Список содержащий все варианты агрегации схемы
             int comNumb = Convert.ToInt32(textBox1.Text);//число коммуникаторов
             int agregNumb = GetStarling(bufList.Count, comNumb);//число всех возможных агрегаций при заданном числе коммуникаторов
             for (int i = 0; i < agregNumb; i++)
             {
-                pereborList.Add(new pereborMod());
+                pereborList.Add(new agrStruct());
                 for (int j = 0; j < comNumb; j++)
                 {
-                    pereborList[i].comList.Add(new pereborMod.comClass());
+                    pereborList[i].comList.Add(new agrStruct.comClass());
                 }
             }
             int[] nums = new int[bufList.Count];
@@ -1930,13 +1975,14 @@ namespace DiplomV01
 
         private void parallel()
         {
+            dataReset();
             clearData();
             //моделирование когда число коммуникаторов = число буферов
             //первый этап, каждый внешний буфер реализуется отдельным коммуникатором
-            List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
+            List<comRemove> comList = new List<comRemove>();//список коммуникаторов
             for (int i = 0; i < bufList.Count; i++)
             {//присвоение коммуникаторам буферов
-                comList.Add(new nedogruzMod());//создаем коммуникатор
+                comList.Add(new comRemove());//создаем коммуникатор
                 comList[i].comBufList.Add(i);//добавляем в него буфер
             }
             //подключенные к коммуникатору машины
@@ -2469,10 +2515,10 @@ namespace DiplomV01
         {
             clearData();
             //первый этап, каждый внешний буфер реализуется отдельным коммуникатором
-            List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
+            List<comRemove> comList = new List<comRemove>();//список коммуникаторов
             for(int i = 0; i < bufList.Count; i++)
             {//присвоение коммуникаторам буферов
-                comList.Add(new nedogruzMod());//создаем коммуникатор
+                comList.Add(new comRemove());//создаем коммуникатор
                 comList[i].comBufList.Add(i);//добавляем в него буфер
             }
             //подключенные к коммуникатору машины
@@ -2963,6 +3009,7 @@ namespace DiplomV01
         private void sizeOfData()
         {
             clearData();
+            dataReset();
             List<bool> isEnded = new List<bool>();//прошла ли машина все свои команды
             List<int> isEndedCount = new List<int>();//сколько рабочих циклов каждой машины
             for (int i = 0; i < dpmList.Count; i++)
@@ -3106,10 +3153,10 @@ namespace DiplomV01
             }
             //agreg = perfectCombination.First().ToList();//закоментить
             //подключенные к коммуникатору машины
-            List<nedogruzMod> comList = new List<nedogruzMod>();//список коммуникаторов
+            List<comRemove> comList = new List<comRemove>();//список коммуникаторов
             for(int i = 0; i < comCount; i++)//каждый коммуникатор
             {
-                comList.Add(new nedogruzMod());//создаем коммуникатор
+                comList.Add(new comRemove());//создаем коммуникатор
                 //добавляем в коммуникатор буферы
                 for(int j = 0; j < agreg[i].Count; j++)
                 {
@@ -3131,6 +3178,11 @@ namespace DiplomV01
                         comList[j].connectedDPMs.Add(bufList[comList[j].comBufList[k]].output);
                     }
                 }
+            }
+            for (int i = 0; i < comList.Count; i++)
+            {
+                comList[i].connectedDPMs.Sort();
+                comList[i].comBufList.Sort();
             }
             //финальное моделирование
             int pfmc = 0;

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DiplomV01
 {
-    class nedogruzMod
+    class comRemove
     {
         public List<int> comBufList = new List<int>();//буферы реализуемые коммуникатором
         public List<int> connectedDPMs = new List<int>();//машины подключенные к данному коммуникатору

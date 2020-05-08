@@ -64,8 +64,8 @@
     <Compile Include="bufClass.cs" />
     <Compile Include="DPMConnectionClass.cs" />
     <Compile Include="dpmEnterclass.cs" />
-    <Compile Include="nedogruzMod.cs" />
-    <Compile Include="pereborMod.cs" />
+    <Compile Include="comRemove.cs" />
+    <Compile Include="agrStruct.cs" />
     <Compile Include="dpmClass.cs" />
     <Compile Include="mainWindow.cs">
       <SubType>Form</SubType>
